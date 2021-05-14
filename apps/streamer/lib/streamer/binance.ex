@@ -42,6 +42,8 @@ defmodule Streamer.Binance do
       "Trade event received" <>
         "#{trade_event.symbol}@#{trade_event.price}"
     )
+
+    Naive.send_event(trade_event)
   end
 
   # Not sending any messages to Binance, we dont need this right now.
