@@ -6,6 +6,17 @@ defmodule Naive.Trader do
   alias Streamer.Binance.TradeEvent
   alias Decimal, as: D
 
+  defmodule State do
+    @enforce_keys [:symbol, :profit_interval, :tick_size]
+    defstruct [
+      :symbol,
+      :buy_order,
+      :sell_order,
+      :profit_interval,
+      :tick_size,
+    ]
+  end
+
   def start_link(%{} = args) do
     GenServer.start_link(__MODULE__, args, name: :trader)
   end
@@ -16,6 +27,12 @@ defmodule Naive.Trader do
     Logger.info("Initializing new trader for #{symbol}")
 
     tick_size = fetch_tick_size(symbol)
+
+    # Subscribe to TRADE_EVENTS pubsub
+    Phoenix.PubSub.subscribe(
+      Streamer.PubSub,
+      "TRADE_EVENTS:#{symbol}"
+    )
 
     {:ok,
      %State{
@@ -29,7 +46,8 @@ defmodule Naive.Trader do
   # A new trader, no open buy orders
   # We know this due to the buy_order field being nil
   # Used to get current price and can be used to create the buy order
-  def handle_cast(
+  #def handle_cast(
+  def handle_info(
     %TradeEvent{price: price},
     %State{symbol: symbol, buy_order: nil} = state
   ) do
@@ -44,7 +62,8 @@ defmodule Naive.Trader do
 
   # Second state -
   # Buy order is placed
-  def handle_cast(
+  #def handle_cast(
+  def handle_info(
     %TradeEvent{
       buyer_order_id: order_id,
       quantity: quantity
@@ -74,7 +93,8 @@ defmodule Naive.Trader do
 
   # Third state -
   # Confirm sell order fulfilled
-  defp handle_cast(
+  #defp handle_cast(
+  def handle_info(
     %TradeEvent{
       seller_order_id: order_id,
       quantity: quantity
@@ -92,7 +112,8 @@ defmodule Naive.Trader do
 
   # Fallback -
   # Ignore all incoming events as they didnt match anything
-  def handle_cast(%TradeEvent{}, state) do
+  #def handle_cast(%TradeEvent{}, state) do
+  def handle_info(%TradeEvent{}, state) do
     {:noreply, state}
   end
 
@@ -126,15 +147,4 @@ defmodule Naive.Trader do
       )
     )
   end
-end
-
-defmodule State do
-  @enforce_keys [:symbol, :profit_interval, :tick_size]
-  defstruct [
-    :symbol,
-    :buy_order,
-    :sell_order,
-    :profit_interval,
-    :tick_size,
-  ]
 end
